@@ -1,0 +1,85 @@
+name: fajarly
+description: Smart alarm app that forces you out of bed by scanning a barcode or QR code.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management + DI
+  flutter_riverpod: ^2.5.1
+
+  # Routing
+  go_router: ^14.6.2
+
+  # Alarm engine
+  alarm: ^5.2.1
+  flutter_local_notifications: ^17.2.3
+
+  # Scanning
+  mobile_scanner: ^5.2.3
+
+  # Local storage (Hive Community Edition — maintained fork)
+  hive_ce: ^2.7.0
+  hive_ce_flutter: ^2.2.0
+  path_provider: ^2.1.5
+
+  # Platform services
+  permission_handler: ^11.3.1
+  wakelock_plus: ^1.2.8
+  vibration: ^2.0.0
+  device_info_plus: ^11.2.0
+  android_intent_plus: ^5.2.0
+
+  # Code generation (QR + linear barcodes)
+  qr_flutter: ^4.1.0
+  barcode_widget: ^2.0.4
+  share_plus: ^10.1.2
+  gal: ^2.3.0
+  printing: ^5.13.3
+  pdf: ^3.11.1
+
+  # Utilities
+  intl: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/audio/
+    - assets/branding/
+  # Drop an alarm sound at assets/audio/alarm.mp3 before first run.
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "assets/branding/logo.png"
+  min_sdk_android: 24
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/branding/logo.png"
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/branding/logo.png
+  color_dark: "#0F2E6E"
+  image_dark: assets/branding/logo.png
+  android_12:
+    color: "#FFFFFF"
+    image: assets/branding/logo.png
+    color_dark: "#0F2E6E"
+    image_dark: assets/branding/logo.png
+  android: true
+  ios: false
+  web: false

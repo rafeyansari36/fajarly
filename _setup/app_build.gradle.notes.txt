@@ -1,0 +1,30 @@
+`flutter create` generated Kotlin-DSL gradle files (build.gradle.kts), so the
+syntax is a bit different from the Groovy examples you usually see.
+
+1. Edit android/app/build.gradle.kts — bump minSdk to 24:
+
+    defaultConfig {
+        applicationId = "com.fajarly.fajarly"
+        minSdk = 24                         // <- change from flutter.minSdk
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+   `alarm` needs 23+, `mobile_scanner` needs 21+, full-screen intent works
+   reliably from 24+, so 24 is the minimum that makes sense.
+
+2. Your `android:appCategory="alarm"` on the <application> tag (in
+   _setup/AndroidManifest.xml) is what tells Android 14 to auto-grant
+   USE_FULL_SCREEN_INTENT. Also set the Play Console category to "Alarms"
+   before release.
+
+3. If you ever hit a method-count problem (unlikely on a new project), add:
+
+    defaultConfig {
+        ...
+        multiDexEnabled = true
+    }
+    dependencies {
+        implementation("androidx.multidex:multidex:2.0.1")
+    }
