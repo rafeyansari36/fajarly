@@ -11,6 +11,7 @@ import '../../features/onboarding/presentation/providers/onboarding_providers.da
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/qr_generator/presentation/screens/qr_generator_screen.dart';
 import '../../features/scanner/presentation/screens/barcode_setup_screen.dart';
+import '../../features/settings/presentation/screens/diagnostics_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/streaks/presentation/screens/streaks_screen.dart';
 
@@ -57,6 +58,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (_, __) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/diagnostics',
+        builder: (_, __) => const DiagnosticsScreen(),
       ),
       GoRoute(
         path: '/ringing/:id',

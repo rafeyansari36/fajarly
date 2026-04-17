@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../../core/utils/oem_autostart.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../data/settings_prefs.dart';
@@ -66,9 +68,17 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(),
           const _SectionHeader('Reliability'),
           ListTile(
+            leading: const Icon(Icons.health_and_safety_outlined),
+            title: const Text('Alarm diagnostics'),
+            subtitle:
+                const Text('Verify every permission that lets alarms fire on the lock screen'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/diagnostics'),
+          ),
+          ListTile(
             leading: const Icon(Icons.battery_charging_full),
-            title: const Text('Autostart / battery optimization'),
-            subtitle: const Text('Open system settings to keep alarms firing'),
+            title: const Text('Autostart (manufacturer)'),
+            subtitle: const Text('Open the OEM-specific autostart screen'),
             onTap: () async {
               final oem = ref.read(oemAutostartProvider);
               final manufacturer = await oem.detectManufacturer();

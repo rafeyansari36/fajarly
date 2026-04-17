@@ -6,6 +6,7 @@ import '../../../../core/utils/permission_helper.dart';
 import '../../../streaks/presentation/widgets/streak_summary_card.dart';
 import '../providers/alarm_providers.dart';
 import '../widgets/alarm_tile.dart';
+import '../widgets/diagnostics_banner.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -54,6 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
+              const DiagnosticsBanner(),
               const StreakSummaryCard(),
               const SizedBox(height: 16),
               if (alarms.isEmpty)
