@@ -46,12 +46,15 @@ class MainActivity : FlutterActivity() {
                     "canUseFullScreenIntent" -> result.success(canUseFullScreenIntent())
                     "canScheduleExactAlarms" -> result.success(canScheduleExactAlarms())
                     "isIgnoringBatteryOptimizations" -> result.success(isIgnoringBatteryOptimizations())
+                    "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this))
 
                     // Deep-link to the relevant Android Settings page
                     "openFullScreenIntentSettings" -> openFullScreenIntentSettings(result)
                     "openExactAlarmSettings" -> openExactAlarmSettings(result)
                     "openNotificationSettings" -> openNotificationSettings(result)
                     "openBatteryOptimizationSettings" -> openBatteryOptimizationSettings(result)
+                    "openOverlaySettings" -> openOverlaySettings(result)
+                    "openOemPermissionEditor" -> openOemPermissionEditor(result)
                     "openAppSettings" -> openAppSettings(result)
 
                     else -> result.notImplemented()
@@ -158,6 +161,139 @@ class MainActivity : FlutterActivity() {
             data = Uri.parse("package:$packageName")
         }
         safeStart(intent, result)
+    }
+
+    private fun openOverlaySettings(result: MethodChannel.Result) {
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        safeStart(intent, result)
+    }
+
+    /**
+     * Xiaomi / MIUI exposes a separate "Display pop-up windows while running
+     * in background" toggle that doesn't map to SYSTEM_ALERT_WINDOW. It lives
+     * in the MIUI permission editor activity. Similar OEM-specific editors
+     * exist on Oppo / Vivo but with different component names — try the
+     * known ones in order and fall through to app details if none launch.
+     */
+    private fun openOemPermissionEditor(result: MethodChannel.Result) {
+        val candidates = listOf(
+            // ─── OxygenOS / ColorOS (OnePlus, Oppo, Realme) ────────────
+            // OxygenOS 13+ / ColorOS 13+ uses the "oplus" package namespace.
+            Intent().apply {
+                setClassName(
+                    "com.oplus.safecenter",
+                    "com.oplus.safecenter.permission.floatwindow.FloatWindowListActivity"
+                )
+            },
+            Intent().apply {
+                setClassName(
+                    "com.oplus.safecenter",
+                    "com.oplus.safecenter.permission.PermissionTopActivity"
+                )
+            },
+            // Older ColorOS / OxygenOS (< 13)
+            Intent().apply {
+                setClassName(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.permission.floatwindow.FloatWindowListActivity"
+                )
+            },
+            Intent().apply {
+                setClassName(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.sysfloatwindow.FloatWindowListActivity"
+                )
+            },
+            Intent().apply {
+                setClassName(
+                    "com.oppo.safe",
+                    "com.oppo.safe.permission.floatwindow.FloatWindowListActivity"
+                )
+            },
+
+            // ─── HyperOS / MIUI (Xiaomi / Redmi / Poco) ────────────────
+            // Implicit action — lets the resolver pick the right editor
+            // regardless of MIUI / HyperOS version.
+            Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                putExtra("extra_pkgname", packageName)
+            },
+            Intent("miui.intent.action.APP_PERMISSIONS_EDITOR").apply {
+                putExtra("extra_pkgname", packageName)
+            },
+            Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                setClassName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.permissions.PermissionsEditorActivity"
+                )
+                putExtra("extra_pkgname", packageName)
+            },
+            Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                setClassName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.permissions.AppPermissionsEditorActivity"
+                )
+                putExtra("extra_pkgname", packageName)
+            },
+
+            // ─── FuntouchOS / OriginOS (Vivo / iQOO) ───────────────────
+            Intent().apply {
+                setClassName(
+                    "com.vivo.permissionmanager",
+                    "com.vivo.permissionmanager.activity.SoftPermissionDetailActivity"
+                )
+                putExtra("packagename", packageName)
+            },
+            Intent().apply {
+                setClassName(
+                    "com.iqoo.secure",
+                    "com.iqoo.secure.ui.phoneoptimize.FloatWindowManager"
+                )
+            },
+
+            // ─── Magic OS / EMUI (Honor / Huawei) ──────────────────────
+            Intent().apply {
+                setClassName(
+                    "com.huawei.systemmanager",
+                    "com.huawei.permissionmanager.ui.MainActivity"
+                )
+            },
+            Intent().apply {
+                setClassName(
+                    "com.huawei.systemmanager",
+                    "com.huawei.notificationmanager.ui.NotificationManagmentActivity"
+                )
+            },
+
+            // ─── One UI (Samsung) ──────────────────────────────────────
+            // Samsung mostly routes through AOSP; this activity exists on
+            // some older One UI builds for the app-level settings screen.
+            Intent().apply {
+                setClassName(
+                    "com.samsung.android.lool",
+                    "com.samsung.android.sm.ui.battery.BatteryActivity"
+                )
+            }
+        )
+
+        for (intent in candidates) {
+            try {
+                // resolveActivity returns null when no matching activity exists —
+                // cheaper than catching ActivityNotFoundException on every miss.
+                if (intent.resolveActivity(packageManager) != null) {
+                    startActivity(intent)
+                    result.success(true)
+                    return
+                }
+            } catch (_: Exception) {
+                continue
+            }
+        }
+        // Last resort: AOSP overlay permission screen. Every modern ROM has
+        // this at minimum; it's the same permission, just via the generic
+        // Android settings UI instead of the OEM one.
+        openOverlaySettings(result)
     }
 
     private fun safeStart(intent: Intent, result: MethodChannel.Result) {

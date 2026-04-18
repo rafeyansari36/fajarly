@@ -137,6 +137,15 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen>
                   },
                 ),
                 _CheckTile(
+                  label: 'Display pop-up while in background',
+                  subtitle:
+                      'Lets the alarm draw over whatever you\'re doing — opens the per-app switch on MIUI / OxygenOS / ColorOS / FuntouchOS',
+                  granted: report?.displayOverApps ?? false,
+                  onFix: () async {
+                    await diag.openOemPermissionEditor();
+                  },
+                ),
+                _CheckTile(
                   label: 'Camera',
                   subtitle: 'Scan the unlock code',
                   granted: report?.camera ?? false,
@@ -239,21 +248,63 @@ class _CheckTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Card(
-      child: ListTile(
-        leading: Icon(
-          granted ? Icons.check_circle : Icons.cancel,
-          color: granted ? scheme.primary : scheme.error,
-          size: 28,
-        ),
-        title: Text(label),
-        subtitle: Text(subtitle),
-        trailing: granted
-            ? null
-            : FilledButton.tonal(
-                onPressed: onFix,
-                child: const Text('Fix'),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                granted ? Icons.check_circle : Icons.cancel,
+                color: granted ? scheme.primary : scheme.error,
+                size: 26,
               ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (!granted)
+                FilledButton.tonal(
+                  onPressed: onFix,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Fix'),
+                )
+              else
+                Text(
+                  'OK',
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

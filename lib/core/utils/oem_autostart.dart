@@ -10,6 +10,9 @@ import 'package:device_info_plus/device_info_plus.dart';
 class OemAutostart {
   const OemAutostart();
 
+  // Candidates are tried in order per manufacturer — the first one whose
+  // activity exists on the device wins. OxygenOS 13+ and ColorOS 13+ moved
+  // from `com.coloros.*` to `com.oplus.*`, so we try the new path first.
   static const _map = <String, List<_Component>>{
     'xiaomi': [
       _Component('com.miui.securitycenter',
@@ -23,17 +26,33 @@ class OemAutostart {
       _Component('com.miui.securitycenter',
           'com.miui.permcenter.autostart.AutoStartManagementActivity'),
     ],
+    'oneplus': [
+      _Component('com.oplus.safecenter',
+          'com.oplus.safecenter.startupapp.StartupAppListActivity'),
+      _Component('com.coloros.safecenter',
+          'com.coloros.safecenter.startupapp.StartupAppListActivity'),
+      _Component('com.coloros.safecenter',
+          'com.coloros.safecenter.permission.startup.StartupAppListActivity'),
+    ],
     'oppo': [
+      _Component('com.oplus.safecenter',
+          'com.oplus.safecenter.startupapp.StartupAppListActivity'),
       _Component('com.coloros.safecenter',
           'com.coloros.safecenter.permission.startup.StartupAppListActivity'),
       _Component('com.oppo.safe',
           'com.oppo.safe.permission.startup.StartupAppListActivity'),
     ],
     'realme': [
+      _Component('com.oplus.safecenter',
+          'com.oplus.safecenter.startupapp.StartupAppListActivity'),
       _Component('com.coloros.safecenter',
           'com.coloros.safecenter.permission.startup.StartupAppListActivity'),
     ],
     'vivo': [
+      _Component('com.vivo.permissionmanager',
+          'com.vivo.permissionmanager.activity.BgStartUpManagerActivity'),
+    ],
+    'iqoo': [
       _Component('com.vivo.permissionmanager',
           'com.vivo.permissionmanager.activity.BgStartUpManagerActivity'),
     ],

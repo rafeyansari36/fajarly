@@ -232,9 +232,25 @@ class _WelcomeSlide extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 16),
-          Image.asset('assets/branding/logo.png', height: 200),
-          const SizedBox(height: 8),
+          const SizedBox(height: 24),
+          // White container so the logo (which has its own white background)
+          // looks intentional in dark mode instead of a floating artifact.
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Image.asset('assets/branding/logo.png', height: 180),
+          ),
+          const SizedBox(height: 24),
           Text(
             'Welcome to Fajarly',
             textAlign: TextAlign.center,
@@ -277,9 +293,25 @@ class _PermissionsSlideState extends ConsumerState<_PermissionsSlide> {
   bool _notif = false;
   bool _exact = false;
   bool _camera = false;
+  bool _autoRequested = false;
   bool _requesting = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Auto-fire the three runtime-permission dialogs the first time the user
+    // lands on this slide — no need to tap a button first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoRequestIfNeeded());
+  }
+
+  Future<void> _autoRequestIfNeeded() async {
+    if (_autoRequested) return;
+    _autoRequested = true;
+    await _requestAll();
+  }
+
   Future<void> _requestAll() async {
+    if (_requesting) return;
     setState(() => _requesting = true);
     final results = await [
       Permission.notification,
@@ -301,18 +333,20 @@ class _PermissionsSlideState extends ConsumerState<_PermissionsSlide> {
       icon: Icons.shield_outlined,
       title: 'Grant permissions',
       body:
-          'Notifications and exact alarms are required for the alarm to fire on time. Camera is needed to scan your unlock code.',
+          'Notifications and exact alarms are required for the alarm to fire on time. Camera is needed to scan your unlock code. We ask for all three automatically — tap Allow on each dialog.',
       action: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _PermRow(label: 'Notifications', granted: _notif),
           _PermRow(label: 'Exact alarm', granted: _exact),
           _PermRow(label: 'Camera', granted: _camera),
-          const SizedBox(height: 16),
-          FilledButton.tonal(
-            onPressed: _requesting ? null : _requestAll,
-            child: Text(_requesting ? 'Requesting…' : 'Grant permissions'),
-          ),
+          if (!_notif || !_exact || !_camera) ...[
+            const SizedBox(height: 16),
+            FilledButton.tonal(
+              onPressed: _requesting ? null : _requestAll,
+              child: Text(_requesting ? 'Requesting…' : 'Re-request permissions'),
+            ),
+          ],
         ],
       ),
     );
@@ -327,15 +361,15 @@ class _BackgroundSlide extends ConsumerStatefulWidget {
 
 class _BackgroundSlideState extends ConsumerState<_BackgroundSlide>
     with WidgetsBindingObserver {
-  bool _granted = false;
-  bool _fullScreen = false;
+  DiagnosticsReport? _report;
+  bool _autoRequested = false;
   bool _requesting = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _refresh();
+    _refresh().then((_) => _autoRequestIfNeeded());
   }
 
   @override
@@ -346,62 +380,193 @@ class _BackgroundSlideState extends ConsumerState<_BackgroundSlide>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // User comes back from Settings — re-check.
     if (state == AppLifecycleState.resumed) _refresh();
   }
 
   Future<void> _refresh() async {
     final report = await const AlarmDiagnostics().check();
     if (!mounted) return;
-    setState(() {
-      _granted = report.batteryUnrestricted;
-      _fullScreen = report.fullScreenIntent;
-    });
+    setState(() => _report = report);
   }
 
-  Future<void> _request() async {
+  /// On the very first visit, auto-chain the system dialogs so the user
+  /// doesn't have to find and tap three Allow buttons. Android requires an
+  /// explicit user tap for each — we can't bypass that — but we can at
+  /// least make the dialogs appear in sequence without extra UI friction.
+  Future<void> _autoRequestIfNeeded() async {
+    if (_autoRequested) return;
+    _autoRequested = true;
+    await _requestAllSequentially();
+  }
+
+  Future<void> _requestAllSequentially() async {
+    if (_requesting) return;
     setState(() => _requesting = true);
-    // This fires the Android "Allow this app to always run in background?" dialog.
-    await Permission.ignoreBatteryOptimizations.request();
-    // Also ask the user to grant full-screen notifications (Android 14+).
-    await const AlarmDiagnostics().openFullScreenIntentSettings();
-    if (!mounted) return;
-    setState(() => _requesting = false);
-    await _refresh();
+    final diag = const AlarmDiagnostics();
+
+    // 1. Battery unrestricted — this fires the standard Android yes/no dialog.
+    if (!(_report?.batteryUnrestricted ?? false)) {
+      await diag.requestBatteryUnrestricted();
+      await _refresh();
+    }
+
+    // 2. Full-screen notifications — opens a Settings page the user must
+    //    return from. Only jump there if not already granted.
+    if (!(_report?.fullScreenIntent ?? false) && mounted) {
+      await diag.openFullScreenIntentSettings();
+      // Lifecycle observer will re-refresh when user returns.
+    }
+
+    if (mounted) setState(() => _requesting = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final r = _report;
+    final diag = const AlarmDiagnostics();
+    final allGreen = r?.alarmWillFireOnLockScreen ?? false;
+
     return _SlideShell(
       icon: Icons.bolt,
       title: 'Allow background running',
       body:
-          'Android kills apps aggressively when the phone is idle. Fajarly needs to run in the background so it can fire the alarm even when your screen is locked. Without this, the alarm will NOT ring.',
+          'Android kills apps aggressively when idle. Fajarly needs the two switches below to fire the alarm while your phone is locked. We will ask for each one automatically — tap Allow in each dialog.',
       action: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _PermRow(label: 'Battery unrestricted (background)', granted: _granted),
-          _PermRow(label: 'Full-screen notifications', granted: _fullScreen),
-          const SizedBox(height: 16),
-          FilledButton.tonal(
-            onPressed: _requesting ? null : _request,
-            child: Text(_requesting ? 'Opening…' : 'Allow background running'),
+          _PermActionRow(
+            label: 'Battery unrestricted',
+            granted: r?.batteryUnrestricted ?? false,
+            onAllow: () async {
+              await diag.requestBatteryUnrestricted();
+              await _refresh();
+            },
           ),
-          if (_granted && _fullScreen) ...[
-            const SizedBox(height: 12),
+          _PermActionRow(
+            label: 'Full-screen notifications',
+            granted: r?.fullScreenIntent ?? false,
+            onAllow: () async {
+              await diag.openFullScreenIntentSettings();
+            },
+          ),
+          const SizedBox(height: 20),
+          _ManualNote(
+            title: 'One more thing — do this manually',
+            body:
+                'On some phones (Xiaomi, OnePlus, Oppo, Vivo) there is a separate "Display pop-up while in background" switch we can\'t toggle for you. Open system Settings → Apps → Fajarly Pro → Permissions → Other permissions and turn it on.',
+          ),
+          const SizedBox(height: 16),
+          if (!allGreen)
+            FilledButton.tonal(
+              onPressed: _requesting ? null : _requestAllSequentially,
+              child: Text(_requesting
+                  ? 'Requesting…'
+                  : 'Re-run permission requests'),
+            ),
+          if (allGreen) ...[
+            const SizedBox(height: 8),
             Row(children: [
               Icon(Icons.check_circle, size: 18, color: scheme.primary),
               const SizedBox(width: 6),
-              Text('Your alarm will fire on the lock screen',
+              Expanded(
+                child: Text(
+                  'Your alarm will fire on the lock screen',
                   style: TextStyle(
                     color: scheme.primary,
                     fontWeight: FontWeight.w600,
-                  )),
+                  ),
+                ),
+              ),
             ]),
           ],
         ],
       ),
+    );
+  }
+}
+
+class _ManualNote extends StatelessWidget {
+  const _ManualNote({required this.title, required this.body});
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: scheme.tertiary, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        )),
+                const SizedBox(height: 4),
+                Text(body,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          height: 1.4,
+                        )),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PermActionRow extends StatelessWidget {
+  const _PermActionRow({
+    required this.label,
+    required this.granted,
+    required this.onAllow,
+  });
+  final String label;
+  final bool granted;
+  final Future<void> Function() onAllow;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        Icon(
+          granted ? Icons.check_circle : Icons.radio_button_unchecked,
+          color: granted ? scheme.primary : scheme.outline,
+          size: 22,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        ),
+        const SizedBox(width: 8),
+        if (!granted)
+          FilledButton.tonal(
+            onPressed: onAllow,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: const Size(0, 36),
+            ),
+            child: const Text('Allow'),
+          )
+        else
+          Text('Granted',
+              style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600)),
+      ]),
     );
   }
 }
